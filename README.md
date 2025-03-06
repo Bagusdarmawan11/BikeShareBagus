@@ -53,8 +53,6 @@ streamlit run dashboard/dashboard.py
 📁 submission/
 │── 📂 dashboard/
 │   ├── 📝 dashboard.py
-|   ├── 📄 day.csv
-│   ├── 📄 hour.csv
 │── 📂 data/
 │   ├── 📄 day.csv
 │   ├── 📄 hour.csv
