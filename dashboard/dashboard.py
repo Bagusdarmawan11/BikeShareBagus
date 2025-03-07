@@ -1,97 +1,79 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
 
 # Load dataset
 day_df = pd.read_csv("data/day.csv")
 hour_df = pd.read_csv("data/hour.csv")
 
-# Mapping season and weather categories
-season_mapping = {1: "Spring", 2: "Summer", 3: "Fall", 4: "Winter"}
-weather_mapping = {1: "Clear", 2: "Mist", 3: "Light Snow/Rain", 4: "Heavy Snow/Rain"}
+# Streamlit UI
+st.title("Bike Sharing Dashboard")
 
-day_df["season"] = day_df["season"].map(season_mapping)
-day_df["weathersit"] = day_df["weathersit"].map(weather_mapping)
+# Sidebar interaktif
+st.sidebar.header("Filter Data")
+selected_season = st.sidebar.selectbox("Pilih Musim:", options=["All", 1, 2, 3, 4], format_func=lambda x: "Semua" if x == "All" else ["Spring", "Summer", "Fall", "Winter"][x-1])
+selected_weather = st.sidebar.selectbox("Pilih Kondisi Cuaca:", options=["All", 1, 2, 3, 4], format_func=lambda x: "Semua" if x == "All" else ["Clear", "Cloudy", "Light Rain", "Heavy Rain"][x-1])
+selected_day = st.sidebar.selectbox("Pilih Hari:", options=["All", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])
+selected_month = st.sidebar.selectbox("Pilih Bulan:", options=["All"] + list(range(1, 13)), format_func=lambda x: "Semua" if x == "All" else f"Bulan {x}")
+selected_hour = st.sidebar.selectbox("Pilih Jam:", options=["All"] + list(range(24)), format_func=lambda x: "Semua" if x == "All" else f"Jam {x}")
 
-# Sidebar
-st.sidebar.title("🔍 Filter dan Navigasi")
-st.sidebar.write("Gunakan filter untuk menyesuaikan tampilan data.")
+# Filter data berdasarkan pilihan
+filtered_df = day_df.copy()
+if selected_season != "All":
+    filtered_df = filtered_df[filtered_df["season"] == selected_season]
+if selected_weather != "All":
+    filtered_df = filtered_df[filtered_df["weathersit"] == selected_weather]
+if selected_day != "All":
+    filtered_df = filtered_df[filtered_df["weekday"] == selected_day]
+if selected_month != "All":
+    filtered_df = filtered_df[filtered_df["mnth"] == selected_month]
+filtered_hour_df = hour_df.copy() if selected_hour == "All" else hour_df[hour_df["hr"] == selected_hour]
 
-# Filter berdasarkan tanggal dengan try-exception
-st.sidebar.subheader("📅 Filter berdasarkan Tanggal")
-try:
-    start_date = st.sidebar.date_input("Mulai Tanggal", pd.to_datetime(day_df['dteday']).min())
-    end_date = st.sidebar.date_input("Akhir Tanggal", pd.to_datetime(day_df['dteday']).max())
-    day_df = day_df[(pd.to_datetime(day_df['dteday']) >= pd.to_datetime(start_date)) &
-                     (pd.to_datetime(day_df['dteday']) <= pd.to_datetime(end_date))]
-except Exception as e:
-    st.sidebar.warning("⚠️ Pastikan tanggal yang dipilih valid!")
+# Narasi dinamis
+st.markdown("## Analisis")
+season_text = "semua musim" if selected_season == "All" else ["Spring", "Summer", "Fall", "Winter"][selected_season-1]
+weather_text = "semua kondisi cuaca" if selected_weather == "All" else ["Clear", "Cloudy", "Light Rain", "Heavy Rain"][selected_weather-1]
+day_text = "semua hari" if selected_day == "All" else selected_day
+month_text = "semua bulan" if selected_month == "All" else f"Bulan {selected_month}"
+hour_text = "semua jam" if selected_hour == "All" else f"Jam {selected_hour}"
+st.markdown(f"Saat ini, data yang ditampilkan adalah penggunaan sepeda berdasarkan **{season_text}**, dengan kondisi cuaca **{weather_text}**, pada **{day_text}**, di **{month_text}**, dan pada **{hour_text}**.")
 
-# Filter berdasarkan cuaca atau parameter lain
-parameter_filter = st.sidebar.selectbox("Pilih Parameter untuk Filter:", ["Semua", "Cuaca", "User Type"])
-if parameter_filter == "Cuaca":
-    selected_weather = st.sidebar.selectbox("Pilih Cuaca:", day_df["weathersit"].unique())
-    day_df = day_df[day_df["weathersit"] == selected_weather]
-elif parameter_filter == "User Type":
-    selected_user_type = st.sidebar.selectbox("Pilih User Type:", ["Casual", "Registered"])
-    if selected_user_type == "Casual":
-        hour_df = hour_df[hour_df["casual"] > 0]
-    else:
-        hour_df = hour_df[hour_df["registered"] > 0]
+# Visualisasi 1: Distribusi penggunaan sepeda berdasarkan musim
+st.subheader("Distribusi Penggunaan Sepeda Berdasarkan Musim")
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="season", y="cnt", data=filtered_df, palette="Set2", ax=ax)
+ax.set_xticklabels(["Spring", "Summer", "Fall", "Winter"])
+st.pyplot(fig)
 
-# Pilihan visualisasi
-selected_viz = st.sidebar.selectbox("Pilih Visualisasi:", [
-    "Jumlah pengguna berdasarkan musim",
-    "Rata-rata pengguna per jam",
-    "Hasil Clustering"
-])
+# Visualisasi 2: Distribusi penggunaan sepeda berdasarkan cuaca
+st.subheader("Distribusi Penggunaan Sepeda Berdasarkan Kondisi Cuaca")
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="weathersit", y="cnt", data=filtered_df, palette="coolwarm", ax=ax)
+ax.set_xticklabels(["Clear", "Cloudy", "Light Rain", "Heavy Rain"])
+st.pyplot(fig)
 
-# Judul Dashboard
-st.title("📊 Bike Sharing Data Dashboard")
+# Visualisasi 3: Distribusi penggunaan sepeda berdasarkan hari
+st.subheader("Distribusi Penggunaan Sepeda Berdasarkan Hari")
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="weekday", y="cnt", data=filtered_df, palette="pastel", ax=ax)
+st.pyplot(fig)
 
-# Statistik Ringkasan
-st.subheader("📊 Statistik Ringkasan")
-st.write(f"Total Pengguna Sepeda: {day_df['cnt'].sum()}")
-st.write(f"Rata-rata Pengguna Harian: {day_df['cnt'].mean():.2f}")
-st.write(f"Jumlah Hari dalam Dataset: {day_df.shape[0]}")
+# Visualisasi 4: Distribusi penggunaan sepeda berdasarkan bulan
+st.subheader("Distribusi Penggunaan Sepeda Berdasarkan Bulan")
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.boxplot(x="mnth", y="cnt", data=filtered_df, palette="Blues", ax=ax)
+st.pyplot(fig)
 
-# Visualisasi Data
-st.subheader("📈 Visualisasi Data")
-if selected_viz == "Jumlah pengguna berdasarkan musim":
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.boxplot(x="season", y="cnt", data=day_df, palette="Set2", ax=ax)
-    ax.set_xlabel("Musim")
-    ax.set_ylabel("Jumlah Pengguna Sepeda")
-    ax.set_title("Distribusi Penggunaan Sepeda Berdasarkan Musim")
-    st.pyplot(fig)
-
-elif selected_viz == "Rata-rata pengguna per jam":
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.lineplot(x="hr", y="cnt", data=hour_df, estimator="mean", ci=None, marker="o", color="b", ax=ax)
-    ax.set_xlabel("Jam dalam Sehari")
-    ax.set_ylabel("Rata-rata Jumlah Pengguna Sepeda")
-    ax.set_title("Rata-rata Penggunaan Sepeda Berdasarkan Jam dalam Sehari")
-    st.pyplot(fig)
-
-elif selected_viz == "Hasil Clustering":
-    st.subheader("🎯 Hasil Clustering")
-    clustering_features = hour_df[["hr", "season", "weathersit", "cnt"]]
-    scaler = MinMaxScaler()
-    scaled_features = scaler.fit_transform(clustering_features)
-    
-    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
-    hour_df["cluster"] = kmeans.fit_predict(scaled_features)
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.scatterplot(x=hour_df["hr"], y=hour_df["cnt"], hue=hour_df["cluster"], palette="Set1", ax=ax)
-    ax.set_xlabel("Jam dalam Sehari")
-    ax.set_ylabel("Jumlah Pengguna Sepeda")
-    ax.set_title("Hasil Clustering Pola Penggunaan Sepeda")
-    st.pyplot(fig)
+# Visualisasi 5: Waktu paling ramai dan paling sepi penggunaan sepeda dalam sehari
+st.subheader("Waktu Paling Ramai dan Paling Sepi Penggunaan Sepeda")
+fig, ax = plt.subplots(figsize=(10, 5))
+sns.lineplot(x="hr", y="cnt", data=filtered_hour_df, marker="o", ax=ax)
+ax.set_xlabel("Jam")
+ax.set_ylabel("Jumlah Pengguna Sepeda")
+ax.set_title("Tren Penggunaan Sepeda dalam Sehari")
+st.pyplot(fig)
 
 # Footer
 st.markdown("---")
-st.markdown("© 2025 Bagus Darmawan. All rights reserved.")
+st.markdown("© 2025 Bagus Darmawan. All Rights Reserved.")
